@@ -1,6 +1,3 @@
-
-
-
 import com.aliucord.gradle.AliucordExtension
 import com.android.build.gradle.BaseExtension
 

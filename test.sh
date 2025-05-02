@@ -1,15 +1,14 @@
 #!/bin/bash
 
 echo "Building AnonymizeAttachmentFilenames plugin..."
-cd ./AliucordPlugins
 ./gradlew :AnonymizeAttachmentFilenames:make
 
 if [ $? -ne 0 ]; then
-    echo "❌ Build failed!"
+    echo "--------- Build failed! ---------"
     exit 1
 fi
 
-echo "✅ Build successful!"
+echo "--------- Build successful! ---------"
 echo "Removing old plugin version..."
 adb shell rm /storage/emulated/0/Aliucord/plugins/AnonymizeAttachmentFilenames*.zip
 
@@ -17,10 +16,10 @@ echo "Installing new plugin version..."
 
 
 
-adb push ./AnonymizeAttachmentFilenames/build/AnonymizeAttachmentFilenames.zip /storage/emulated/0/Aliucord/plugins/
+adb push ./AnonymizeAttachmentFilenames/build/AnonymizeAttachmentFilenames.zip //storage/emulated/0/Aliucord/plugins/
 
 echo "Stopping Discord..."
-adb shell am force-stop com.discord
+adb shell am force-stop com.aliucord
 
 echo "✅ Plugin deployed successfully!"
 echo "Please start Discord manually and upload a file to test the plugin."
