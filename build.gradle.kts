@@ -35,8 +35,8 @@ subprojects {
     aliucord {
         author("_.swaen", 955296933705044018)
 
-        updateUrl.set("https://raw.githubusercontent.com/listlessbird/AliucordPlugins/builds/updater.json")
-        buildUrl.set("https://raw.githubusercontent.com/listlessbird/AliucordPlugins/builds/%s.zip")
+        updateUrl.set("https://raw.githubusercontent.com/listlessbird/AliucordPlugins/build/updater.json")
+        buildUrl.set("https://raw.githubusercontent.com/listlessbird/AliucordPlugins/build/%s.zip")
     }
 
     android {
