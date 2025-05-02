@@ -12,87 +12,122 @@ import com.aliucord.annotations.AliucordPlugin;
 import com.aliucord.api.PatcherAPI;
 import com.aliucord.entities.Plugin;
 import com.aliucord.patcher.Hook;
+import com.aliucord.patcher.PreHook;
 import com.aliucord.utils.ReflectUtils;
+import com.aliucord.wrappers.messages.AttachmentWrapper;
+import com.discord.widgets.chat.MessageContent;
+import com.discord.widgets.chat.MessageManager;
+import com.discord.widgets.chat.input.ChatInputViewModel;
+import com.lytefast.flexinput.model.Attachment;
 
 import java.io.File;
 import java.io.IOException;
+import java.lang.reflect.Field;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 
 import kotlin.jvm.functions.Function1;
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
 
 @SuppressWarnings("unused")
 @AliucordPlugin
 public class AnonymizeAttachmentFilenames extends Plugin {
-    private static final Logger logger = new Logger("AnonymizeAttachmentFilenames");
+    private final Logger logger = new Logger("AnonymizeAttachmentFilenames");
 
     @Override
-    public void start(Context context) throws Throwable {
-        patcher.patch("com.discord.stores.StoreUpload$uploadFiles$1", // Class name
-                "invoke", // Method name
-                new Class<?>[] { Object.class }, // Argument types (adjust if needed)
-                new Hook(param -> {
-                    try {
-                        // The argument might be a List<Uploadable>, Attachment, or similar depending on
-                        // Discord version.
-                        // We need to inspect param.args[0] or relevant fields in param.thisObject
-                        Object arg = param.args[0];
-                        logger.info("Hook triggered. Argument type: %s", arg.getClass().getName());
+    public void start(Context ctx) throws NoSuchMethodError, NoSuchMethodException {
+        // Patch the sendMessage method in ChatInputViewModel to anonymize attachment
+        // filenames
 
-                        // This part requires inspecting the actual objects at runtime or decompiled
-                        // source.
-                        // Let's assume the argument holds or gives access to the file URI/path/name.
-                        // Example: If arg is a list of objects having a 'uri' or 'filename' field.
-                        if (arg instanceof List) {
-                            List<?> items = (List<?>) arg;
-                            for (Object item : items) {
-                                try {
-                                    // Attempt to find and modify filename/URI fields
-                                    // Common fields might be 'filename', 'name', 'uri', 'path'
-                                    Uri uri = (Uri) ReflectUtils.getField(item, "uri"); // Example field name
-                                    String oldFilename = (String) ReflectUtils.getField(item, "filename"); // Example
-                                                                                                           // field name
+        logger.info("Starting AnonAttachment patch");
 
-                                    if (oldFilename != null) {
-                                        String extension = "";
-                                        int dotIndex = oldFilename.lastIndexOf('.');
-                                        if (dotIndex > 0 && dotIndex < oldFilename.length() - 1) {
-                                            extension = oldFilename.substring(dotIndex); // Keep extension (e.g.,
-                                                                                         // ".png")
-                                        }
-                                        String newFilename = UUID.randomUUID().toString() + extension;
+        patcher.patch(ChatInputViewModel.class.getDeclaredMethod("sendMessage", Context.class, MessageManager.class,
+                MessageContent.class, List.class, boolean.class, Function1.class), new PreHook(cf -> {
+                    @SuppressWarnings("unchecked")
+                    List<Attachment<?>> attachments = (List<Attachment<?>>) cf.args[3];
 
-                                        logger.info("Anonymizing filename: '%s' -> '%s'", oldFilename, newFilename);
-                                        ReflectUtils.setField(item, "filename", newFilename);
+                    if (attachments != null && !attachments.isEmpty()) {
+                        for (Attachment<?> attachment : attachments) {
+                            try {
+                                // Get the original filename
+                                String originalFilename = attachment.getDisplayName();
+                                if (originalFilename == null || originalFilename.isEmpty())
+                                    continue;
 
-                                        // If the name is derived from the URI path, we might need to adjust that too,
-                                        // but that's more complex and potentially risky. Let's start with the filename
-                                        // field.
-
-                                    } else {
-                                        logger.info("Could not find 'filename' field in item: %s",
-                                                item.getClass().getName());
-                                    }
-                                } catch (NoSuchFieldException | IllegalAccessException e) {
-                                    logger.error(
-                                            "Failed to access/modify fields for item: " + item.getClass().getName(), e);
+                                // Extract file extension
+                                String extension = "";
+                                int lastDotIndex = originalFilename.lastIndexOf('.');
+                                if (lastDotIndex > 0) {
+                                    extension = originalFilename.substring(lastDotIndex);
                                 }
-                            }
-                        } else {
-                            // Handle cases where the argument is not a list or has a different structure
-                            logger.warn("Argument is not a List: %s. Need to inspect structure.",
-                                    arg.getClass().getName());
-                            // Add logic here based on inspecting the actual `arg` structure
-                        }
 
-                    } catch (Throwable e) {
-                        logger.error("Error in AnonymizeAttachmentFilenames patch", e);
+                                // Generate a new UUID for the filename
+                                String anonymizedFilename = UUID.randomUUID().toString() + extension;
+
+                                // Log the anonymization
+                                logger.info("Anonymizing attachment filename: " + originalFilename + " -> "
+                                        + anonymizedFilename);
+
+                                // Use reflection to set the new filename
+                                ReflectUtils.setField(attachment, "fileName", anonymizedFilename);
+                            } catch (Exception e) {
+                                logger.error("Failed to anonymize attachment filename", e);
+                            }
+                        }
                     }
                 }));
+
+        // Patch HTTP requests to catch attachment uploads
+        patcher.patch(Http.Request.class.getDeclaredMethod("executeWithBody", String.class), new PreHook(cf -> {
+            try {
+                Http.Request request = (Http.Request) cf.thisObject;
+                String url = request.conn.getURL().toURI().toString();
+                String body = (String) cf.args[0];
+
+                // Check if this is an attachment upload request
+                if (url != null && url.contains("/attachments") && body != null) {
+                    try {
+                        JSONObject jsonBody = new JSONObject(body);
+                        if (jsonBody.has("filename")) {
+                            String originalFilename = jsonBody.getString("filename");
+
+                            // Extract file extension
+                            String extension = "";
+                            int lastDotIndex = originalFilename.lastIndexOf('.');
+                            if (lastDotIndex > 0) {
+                                extension = originalFilename.substring(lastDotIndex);
+                            }
+
+                            // Generate a new UUID for the filename
+                            String anonymizedFilename = UUID.randomUUID().toString() + extension;
+
+                            // Replace the filename in the JSON body
+                            jsonBody.put("filename", anonymizedFilename);
+
+                            // Log the anonymization
+                            logger.info("Anonymizing API attachment filename: " + originalFilename + " -> "
+                                    + anonymizedFilename);
+
+                            // Set the modified body
+                            cf.args[0] = jsonBody.toString();
+                        }
+                    } catch (JSONException e) {
+                        logger.error("Failed to parse attachment JSON", e);
+                    }
+                }
+            } catch (Exception e) {
+                logger.error("Error in HTTP request patch", e);
+            }
+        }));
     }
 
     @Override
     public void stop(Context context) {
+        logger.info("Stopping AnonAttachment patch");
         patcher.unpatchAll();
     }
 }
