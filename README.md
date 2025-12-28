@@ -2,13 +2,9 @@
 
 Plugins for [Aliucord](https://github.com/Aliucord)
 
-## Download
+## Builds
 
 Browse all builds: [build branch](https://github.com/listlessbird/AliucordPlugins/tree/build)
-
-**Direct Downloads:**
-- [AnonymizeAttachmentFilenames.zip](https://github.com/listlessbird/AliucordPlugins/raw/refs/heads/build/AnonymizeAttachmentFilenames.zip)
-- [TapTapReact.zip](https://github.com/listlessbird/AliucordPlugins/raw/refs/heads/build/TapTapReact.zip)
 
 ## Plugins
 
@@ -22,4 +18,4 @@ Anonymizes the filenames of attachments in Discord.
 
 Double-tap messages to quickly add reactions.
 
-**Download:** [TapTapReact.zip](https://github.com/listlessbird/AliucordPlugins/raw/refs/heads/build/TapTapReact.zip) 
+**Download:** [TapTapReact.zip](https://github.com/listlessbird/AliucordPlugins/raw/refs/heads/build/TapTapReact.zip)
